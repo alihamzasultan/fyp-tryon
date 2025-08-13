@@ -1,74 +1,162 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  View,
+  RefreshControl,
+  Image,
+  Dimensions,
+  TouchableOpacity,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import Typo from '@/components/Typo';
+import ScreenWrapper from '@/components/ScreenWrapper';
+import { colors, spacingX, spacingY } from '@/constants/theme';
+import { verticalScale } from '@/utils/styling';
+import { useAuth } from '@/contexts/authContext';
+import { useRouter } from 'expo-router';
+import useFetchData from '@/hooks/useFetchData';
+import { UserType, AdType } from '@/types';
+import AdDetailModal from '../(modals)/AdDetailModal';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const { width } = Dimensions.get('window');
+const cardMargin = spacingX._10;
+const cardWidth = (width - spacingX._20 * 2 - cardMargin) / 2;
 
-export default function HomeScreen() {
+const Home = () => {
+
+  const [selectedAd, setSelectedAd] = useState<AdType | null>(null);
+const [modalVisible, setModalVisible] = useState(false);
+
+const openAdDetails = (ad: AdType) => {
+  setSelectedAd(ad);
+  setModalVisible(true);
+};
+
+const closeAdDetails = () => {
+  setModalVisible(false);
+  setSelectedAd(null);
+};
+
+  const { user } = useAuth();
+  const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const {
+    data: allUsers,
+    loading: usersLoading,
+    error: usersError,
+  } = useFetchData<UserType>('users', []);
+
+  const {
+    data: allAds,
+    loading: adsLoading,
+    error: adsError,
+  } = useFetchData<AdType>('ads', []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1500);
+  }, []);
+  const renderAdItem = ({ item }: { item: AdType }) => {
+    const coverImage = item.images?.[0];
+    return (
+      <TouchableOpacity onPress={() => openAdDetails(item)}>
+        <View style={styles.adCard}>
+          {coverImage && (
+            <Image source={{ uri: coverImage }} style={styles.coverImage} resizeMode="cover" />
+          )}
+          <Typo size={16} fontWeight="600" style={{ marginTop: 6 }}>
+            {item.title}
+          </Typo>
+          <Typo size={14} color={colors.neutral400}>
+            {item.price ? `PKR ${item.price.toLocaleString()}` : 'Price not listed'}
+          </Typo>
+        </View>
+      </TouchableOpacity>
+
+      
+    );
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    
+    <ScreenWrapper>
+
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={{ gap: 4 }}>
+            <Typo size={16} color={colors.neutral400}>Hello,</Typo>
+            <Typo size={20} fontWeight="500">{user?.name}</Typo>
+          </View>
+          <Ionicons name="people-outline" size={verticalScale(24)} color={colors.neutral200} />
+        </View>
+
+        {/* Ads Section */}
+        <Typo size={18} fontWeight="600" style={{ marginBottom: spacingY._10 }}>
+          Latest Ads
+        </Typo>
+
+        {adsLoading ? (
+          <Typo>Loading ads...</Typo>
+        ) : allAds.length === 0 ? (
+          <Typo>No ads found.</Typo>
+        ) : (
+          <FlatList
+            data={allAds}
+            renderItem={renderAdItem}
+            keyExtractor={(_, index) => index.toString()}
+            numColumns={2}
+            columnWrapperStyle={styles.row}
+            contentContainerStyle={styles.flatListContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          />
+        )}
+      </View>
+
+      <AdDetailModal
+  visible={modalVisible}
+  ad={selectedAd}
+  onClose={closeAdDetails}
+/>
+    </ScreenWrapper>
   );
-}
+};
+
+export default Home;
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    paddingHorizontal: spacingX._20,
+    marginTop: verticalScale(8),
+  },
+  header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
+    marginBottom: spacingY._10,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  row: {
+    justifyContent: 'space-between',
+    marginBottom: spacingY._15,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  flatListContent: {
+    paddingBottom: verticalScale(100),
+  },
+  adCard: {
+    backgroundColor: colors.neutral800,
+    borderRadius: 8,
+    overflow: 'hidden',
+    width: cardWidth,
+  },
+  coverImage: {
+    width: '100%',
+    height: verticalScale(120),
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
   },
 });

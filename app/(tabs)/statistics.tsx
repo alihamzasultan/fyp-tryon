@@ -1,0 +1,242 @@
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import ScreenWrapper from '@/components/ScreenWrapper';
+import { scale, verticalScale } from '@/utils/styling';
+import { colors, radius, spacingX, spacingY } from '@/constants/theme';
+import Header from '@/components/Header';
+import Typo from '@/components/Typo';
+import { useAuth } from '@/contexts/authContext';
+import { useRouter } from 'expo-router';
+import { collection, query, where, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { firestore } from '@/config/firebase';
+import { AdType } from '@/types';
+import BackButton from '@/components/BackButton';
+import { MaterialIcons } from '@expo/vector-icons'; // Import the icon library
+
+const Statistics = () => {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [ads, setAds] = useState<AdType[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchUserAds = async () => {
+    try {
+      setLoading(true);
+      const q = query(collection(firestore, 'ads'), where('uid', '==', user?.uid));
+      const snapshot = await getDocs(q);
+      const userAds = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as AdType[];
+      setAds(userAds);
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to load your ads');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.uid) {
+      fetchUserAds();
+    }
+  }, [user?.uid]);
+
+  const handleEdit = (adId: string) => {
+    router.push({
+      pathname: '/(modals)/addModal',
+      params: { adId }, // pass ad ID to modal
+    });
+  };
+
+  const handleDelete = async (adId: string) => {
+    try {
+      Alert.alert(
+        'Delete Ad',
+        'Are you sure you want to delete this ad?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              await deleteDoc(doc(firestore, 'ads', adId));
+              setAds(ads.filter(ad => ad.id !== adId));
+              Alert.alert('Success', 'Ad deleted successfully');
+            },
+          },
+        ],
+        { cancelable: true }
+      );
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to delete ad');
+    }
+  };
+
+  return (
+    <ScreenWrapper>
+      <View style={styles.container}>
+        <Header
+          title={"My Ads"}
+          leftIcon={<BackButton />}
+          style={{ marginBottom: spacingY._10 }}
+        />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Typo style={styles.loadingText}>Loading your ads...</Typo>
+            </View>
+          ) : ads.length === 0 ? (
+            <View style={styles.emptyStateContainer}>
+              <Typo color={colors.neutral500} style={styles.emptyStateText}>
+                You haven't posted any ads yet.
+              </Typo>
+            </View>
+          ) : (
+            ads.map((ad) => (
+              <View key={ad.id} style={styles.adCard}>
+                {ad.images?.[0] && (
+                  <Image
+                    source={{ uri: ad.images[0] }}
+                    style={styles.image}
+                    resizeMode="cover"
+                  />
+                )}
+                <View style={styles.adContent}>
+                  <View style={styles.titleRow}>
+                    <Typo size={16} fontWeight="600" style={styles.titleText}>{ad.title}</Typo>
+                    <TouchableOpacity onPress={() => handleDelete(ad.id!)} style={styles.deleteButton}>
+                      <MaterialIcons name="delete" size={22} color={colors.error} />
+                    </TouchableOpacity>
+                  </View>
+                  <Typo size={14} color={colors.neutral600}>
+                    PKR {ad.price?.toLocaleString?.() || 'N/A'}
+                  </Typo>
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.editActionButton]}
+                      onPress={() => handleEdit(ad.id!)}
+                    >
+                      <Typo color={colors.primary} fontWeight="600">Edit</Typo>
+                    </TouchableOpacity>
+                    {/*  You could add a 'View' button here, or other actions */}
+                  </View>
+                </View>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </View>
+    </ScreenWrapper>
+  );
+};
+
+export default Statistics;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingHorizontal: spacingX._20,
+    paddingTop: spacingY._10,
+    backgroundColor: colors.neutral900,
+  },
+  scrollContent: {
+    paddingBottom: verticalScale(100),
+    gap: spacingY._15,
+  },
+  adCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.neutral50, // Use a light gray instead of pure white
+    borderRadius: radius._12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: spacingY._10,
+  },
+  image: {
+    width: scale(100),
+    height: scale(100),
+  },
+  adContent: {
+    flex: 1,
+    padding: spacingX._10,
+    justifyContent: 'space-between',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    marginTop: spacingY._5,
+  },
+  actionButton: {
+    paddingHorizontal: spacingX._12,
+    paddingVertical: spacingY._8,
+    borderRadius: radius._8,
+    marginRight: spacingX._8,
+    borderWidth: 1,  // Added border to the edit button
+    borderColor: colors.primary,  //Added border to the edit button
+  },
+  editActionButton: {
+    backgroundColor: 'transparent', // No background color, relies on the border
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacingY._3,
+  },
+  titleText: {
+    flex: 1,
+    marginRight: spacingX._5,
+    fontSize: 16,
+    color: colors.neutral800,  // Darker text color for better readability
+  },
+  deleteButton: {
+    padding: spacingX._5,
+    borderRadius: radius._5,
+    backgroundColor: colors.errorLight,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacingY._30,
+  },
+  loadingText: {
+    marginTop: spacingY._10,
+    color: colors.neutral500,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacingY._30,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: colors.neutral500,
+  },
+});

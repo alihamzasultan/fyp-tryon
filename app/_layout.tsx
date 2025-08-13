@@ -1,39 +1,70 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { StyleSheet } from "react-native";
+import { Stack } from "expo-router";
+import { AuthProvider } from "@/contexts/authContext";
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+const StackLayout = () => {
+    return (
+        <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen
+                name="(modals)/profileModal"
+                options={{ presentation: 'modal' }}
+            />
+            <Stack.Screen
+                name="(modals)/walletModal"
+                options={{ presentation: 'modal' }}
+            />
+            <Stack.Screen
+                name="(modals)/transactionModal"
+                options={{ presentation: 'modal' }}
+            />
+            <Stack.Screen
+                name="(modals)/searchModal"
+                options={{ presentation: 'modal' }}
+            />
+            <Stack.Screen
+                name="(modals)/info"
+                options={{ presentation: 'modal' }}
+            />
+            <Stack.Screen
+                name="(modals)/currencyModal"
+                options={{ presentation: 'modal' }}
+            />
+            <Stack.Screen
+                name="(modals)/incomeModal"
+                options={{ presentation: 'modal' }}
+            />
+            <Stack.Screen
+                name="(modals)/expenseModal"
+                options={{ presentation: 'modal' }}
+            />
+                    <Stack.Screen
+                name="(modals)/addModal"
+                options={{ presentation: 'modal' }}
+            />
+        </Stack>
+    );
+};
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+    useEffect(() => {
+        // Prevent auto-hiding initially
+        SplashScreen.preventAutoHideAsync();
+        
+        // Hide splash screen after everything is ready
+        const hideSplash = async () => {
+            await SplashScreen.hideAsync();
+        };
+        
+        hideSplash();
+    }, []);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
-
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  );
+    return (
+        <AuthProvider>
+            <StackLayout />
+        </AuthProvider>
+    );
 }
+
+const styles = StyleSheet.create({});
