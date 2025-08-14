@@ -22,28 +22,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const router = useRouter();
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-      // console.log('firebase user: ', firebaseUser);
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        await firebaseUser.reload(); // refresh user data
+  
+        if (!firebaseUser.emailVerified) {
+          // If not verified, keep them in login/verification flow
+          router.replace("/(auth)/login");
+          return;
+        }
+  
         setUser({
-          uid: firebaseUser?.uid,
-          email: firebaseUser?.email,
-          name: firebaseUser?.displayName
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: firebaseUser.displayName
         });
+  
         updateUserData(firebaseUser.uid);
-        router.replace("/(tabs)")
+        router.replace("/(tabs)/"); 
       } else {
-        // no user
         setUser(null);
-        router.replace("/(auth)/welcome")
+        router.replace("/(auth)/welcome");
       }
     });
+  
     return () => unsub();
   }, []);
-
+  
   const login = async (email: string, password: string) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  
+      // 🔄 Force refresh user data to get updated emailVerified status
+      await userCredential.user.reload();
   
       if (!userCredential.user.emailVerified) {
         await sendEmailVerification(userCredential.user);
@@ -62,6 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return { success: false, msg };
     }
   };
+  
+  
   
   
   type RegisterResponse = {
