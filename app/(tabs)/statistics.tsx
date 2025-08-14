@@ -15,18 +15,21 @@ import { colors, radius, spacingX, spacingY } from '@/constants/theme';
 import Header from '@/components/Header';
 import Typo from '@/components/Typo';
 import { useAuth } from '@/contexts/authContext';
-import { useRouter } from 'expo-router';
-import { collection, query, where, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { collection, query, where, getDocs, doc, deleteDoc, getCountFromServer } from 'firebase/firestore';
 import { firestore } from '@/config/firebase';
 import { AdType } from '@/types';
 import BackButton from '@/components/BackButton';
-import { MaterialIcons } from '@expo/vector-icons'; // Import the icon library
+import { MaterialIcons, Ionicons } from '@expo/vector-icons'; // Import the icon library
 
 const Statistics = () => {
   const { user } = useAuth();
   const router = useRouter();
   const [ads, setAds] = useState<AdType[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [requestCounts, setRequestCounts] = useState<{[adId: string]: number}>({}); // Store request counts for each ad
+
 
   const fetchUserAds = async () => {
     try {
@@ -38,6 +41,30 @@ const Statistics = () => {
         ...doc.data(),
       })) as AdType[];
       setAds(userAds);
+
+      // Fetch request counts for each ad
+      const requestCountsPromises = userAds.map(async (ad) => {
+        const requestsQuery = query(
+          collection(firestore, 'requests'),
+          where('adId', '==', ad.id),
+          where('receiverUid', '==', user?.uid),
+          where('status', '==', 'pending') // ONLY PENDING REQUESTS
+        );
+        const snapshot = await getCountFromServer(requestsQuery);
+        return { adId: ad.id, count: snapshot.data().count };
+      });
+
+      const counts = await Promise.all(requestCountsPromises);
+      const countsObject: {[adId: string]: number} = {};
+      counts.forEach(({ adId, count }) => {
+        if (adId) { // Add this check
+          countsObject[adId] = count;
+        } else {
+          console.warn("Ad ID is undefined. Skipping.");
+        }
+      });
+      setRequestCounts(countsObject);
+
     } catch (err) {
       console.error(err);
       Alert.alert('Error', 'Failed to load your ads');
@@ -45,12 +72,13 @@ const Statistics = () => {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (user?.uid) {
-      fetchUserAds();
-    }
-  }, [user?.uid]);
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.uid) {
+        fetchUserAds();
+      }
+    }, [user?.uid])
+  );
 
   const handleEdit = (adId: string) => {
     router.push({
@@ -85,6 +113,13 @@ const Statistics = () => {
       console.error(err);
       Alert.alert('Error', 'Failed to delete ad');
     }
+  };
+
+  const handleViewRequests = (adId: string) => {
+    router.push({
+      pathname: '/(modals)/adrequestModal',
+      params: { adId }, // pass ad ID to modal
+    });
   };
 
   return (
@@ -131,13 +166,24 @@ const Statistics = () => {
                     PKR {ad.price?.toLocaleString?.() || 'N/A'}
                   </Typo>
                   <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                      style={[styles.actionButton, styles.viewRequestsButton]}
+                      onPress={() => handleViewRequests(ad.id!)}
+                    >
+                      <Typo color={colors.neutral600} fontWeight="400">Requests</Typo>
+                      {requestCounts[ad.id!] > 0 && (
+                        <View style={styles.notificationBadge}>
+                          <Typo size={10} color={colors.white}>{requestCounts[ad.id!]}</Typo>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+
                     <TouchableOpacity
                       style={[styles.actionButton, styles.editActionButton]}
                       onPress={() => handleEdit(ad.id!)}
                     >
                       <Typo color={colors.primary} fontWeight="600">Edit</Typo>
                     </TouchableOpacity>
-                    {/*  You could add a 'View' button here, or other actions */}
                   </View>
                 </View>
               </View>
@@ -196,11 +242,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacingY._8,
     borderRadius: radius._8,
     marginRight: spacingX._8,
-    borderWidth: 1,  // Added border to the edit button
-    borderColor: colors.primary,  //Added border to the edit button
   },
   editActionButton: {
     backgroundColor: 'transparent', // No background color, relies on the border
+    borderWidth: 1,  // Added border to the edit button
+    borderColor: colors.primary,  //Added border to the edit button
+  },
+  viewRequestsButton: {
+    backgroundColor: colors.neutral200, // A distinct color for the view requests button
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   titleRow: {
     flexDirection: 'row',
@@ -238,5 +289,16 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 16,
     color: colors.neutral500,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: colors.error,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

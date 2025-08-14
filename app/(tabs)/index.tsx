@@ -91,7 +91,14 @@ const closeAdDetails = () => {
             <Typo size={16} color={colors.neutral400}>Hello,</Typo>
             <Typo size={20} fontWeight="500">{user?.name}</Typo>
           </View>
-          <Ionicons name="people-outline" size={verticalScale(24)} color={colors.neutral200} />
+          <Ionicons
+            name="chatbubble-ellipses-outline"
+            size={verticalScale(24)}
+            color={colors.neutral200}
+            onPress={() => router.push('/(modals)/chatsModal')}
+          />
+
+
         </View>
 
         {/* Ads Section */}
@@ -155,7 +162,7 @@ const styles = StyleSheet.create({
   },
   coverImage: {
     width: '100%',
-    height: verticalScale(120),
+    height: verticalScale(180),
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
   },

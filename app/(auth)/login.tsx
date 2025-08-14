@@ -29,9 +29,12 @@ const login = () => {
         setIsLoading(true);
         const res= await loginUser(emailRef.current, passwordRef.current);
         setIsLoading(false);
-        if (!res.success){
-            Alert.alert("login", res.msg);
-        }
+        if (!res.success) {
+            Alert.alert("Login", res.msg);
+          } else {
+            router.replace("/(tabs)"); // navigate right away
+          }
+          
         };
 
     return (
