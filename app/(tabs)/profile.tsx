@@ -68,7 +68,7 @@ const Profile = () => {
     // },
 
     {
-      title: "Place an ad",
+      title: "Become a seller",
       icon: (
         <Ionicons
           name="add"

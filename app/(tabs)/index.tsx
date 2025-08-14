@@ -8,6 +8,7 @@ import {
   Image,
   Dimensions,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Typo from '@/components/Typo';
@@ -39,7 +40,8 @@ const closeAdDetails = () => {
   setSelectedAd(null);
 };
 
-  const { user } = useAuth();
+const { user, loading: userLoading } = useAuth();
+
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -79,6 +81,16 @@ const closeAdDetails = () => {
       
     );
   };
+  if (userLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' , backgroundColor:"#111827"}}>
+        <ActivityIndicator size="large" color="#4B9CE2" />
+        <Typo size={16} style={{ marginTop: 10 }}>Loading...</Typo>
+        <Typo size={16} style={{ marginTop: 10 }}>Please wait</Typo>
+      </View>
+    );
+  }
+
 
   return (
     
@@ -92,10 +104,10 @@ const closeAdDetails = () => {
             <Typo size={20} fontWeight="500">{user?.name}</Typo>
           </View>
           <Ionicons
-            name="chatbubble-ellipses-outline"
+            name="cart-outline"
             size={verticalScale(24)}
             color={colors.neutral200}
-            onPress={() => router.push('/(modals)/chatsModal')}
+            onPress={() => router.push('/(modals)/cartModal')}
           />
 
 
@@ -162,7 +174,7 @@ const styles = StyleSheet.create({
   },
   coverImage: {
     width: '100%',
-    height: verticalScale(180),
+    height: verticalScale(150),
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
   },

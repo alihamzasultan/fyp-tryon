@@ -2,25 +2,25 @@ import {
   Alert,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   Image,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import ScreenWrapper from '@/components/ScreenWrapper';
 import { scale, verticalScale } from '@/utils/styling';
 import { colors, radius, spacingX, spacingY } from '@/constants/theme';
 import Header from '@/components/Header';
 import Typo from '@/components/Typo';
 import { useAuth } from '@/contexts/authContext';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { collection, query, where, getDocs, doc, deleteDoc, getCountFromServer } from 'firebase/firestore';
 import { firestore } from '@/config/firebase';
 import { AdType } from '@/types';
 import BackButton from '@/components/BackButton';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons'; // Import the icon library
+import { MaterialIcons } from '@expo/vector-icons';
 
 const Statistics = () => {
   const { user } = useAuth();
@@ -28,113 +28,109 @@ const Statistics = () => {
   const [ads, setAds] = useState<AdType[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [requestCounts, setRequestCounts] = useState<{[adId: string]: number}>({}); // Store request counts for each ad
+  const [requestCounts, setRequestCounts] = useState<{ [adId: string]: number }>({});
 
-
-  const fetchUserAds = async () => {
+  const fetchUserAds = async (isRefresh = false) => {
+    if (!user?.uid) return;
+  
     try {
-      setLoading(true);
-      const q = query(collection(firestore, 'ads'), where('uid', '==', user?.uid));
+      if (!isRefresh) setLoading(true);
+  
+      const q = query(
+        collection(firestore, 'ads'),
+        where('uid', '==', user.uid)
+      );
       const snapshot = await getDocs(q);
+  
       const userAds = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as AdType[];
+  
       setAds(userAds);
-
-      // Fetch request counts for each ad
+  
       const requestCountsPromises = userAds.map(async (ad) => {
         const requestsQuery = query(
           collection(firestore, 'requests'),
           where('adId', '==', ad.id),
-          where('receiverUid', '==', user?.uid),
-          where('status', '==', 'pending') // ONLY PENDING REQUESTS
+          where('receiverUid', '==', user.uid),
+          where('status', '==', 'UNSEEN')  // only unseen requests
         );
         const snapshot = await getCountFromServer(requestsQuery);
         return { adId: ad.id, count: snapshot.data().count };
       });
-
+  
       const counts = await Promise.all(requestCountsPromises);
-      const countsObject: {[adId: string]: number} = {};
+      const countsObject: { [adId: string]: number } = {};
       counts.forEach(({ adId, count }) => {
-        if (adId) { // Add this check
-          countsObject[adId] = count;
-        } else {
-          console.warn("Ad ID is undefined. Skipping.");
-        }
+        if (adId) countsObject[adId] = count;
       });
       setRequestCounts(countsObject);
-
     } catch (err) {
       console.error(err);
       Alert.alert('Error', 'Failed to load your ads');
     } finally {
-      setLoading(false);
+      if (isRefresh) setRefreshing(false);
+      else setLoading(false);
     }
   };
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user?.uid) {
-        fetchUserAds();
-      }
-    }, [user?.uid])
-  );
+  
+
+  useEffect(() => {
+    if (user?.uid) {
+      fetchUserAds();
+    }
+  }, [user?.uid]);
+  
+
+  const onRefresh = useCallback(() => {
+    fetchUserAds(true);
+  }, []);
 
   const handleEdit = (adId: string) => {
-    router.push({
-      pathname: '/(modals)/addModal',
-      params: { adId }, // pass ad ID to modal
-    });
+    router.push({ pathname: '/(modals)/addModal', params: { adId } });
   };
 
-  const handleDelete = async (adId: string) => {
-    try {
-      Alert.alert(
-        'Delete Ad',
-        'Are you sure you want to delete this ad?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              await deleteDoc(doc(firestore, 'ads', adId));
-              setAds(ads.filter(ad => ad.id !== adId));
-              Alert.alert('Success', 'Ad deleted successfully');
-            },
-          },
-        ],
-        { cancelable: true }
-      );
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Error', 'Failed to delete ad');
-    }
+  const handleDelete = (adId: string) => {
+    Alert.alert('Delete Ad', 'Are you sure you want to delete this ad?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteDoc(doc(firestore, 'ads', adId));
+          setAds((prev) => prev.filter((ad) => ad.id !== adId));
+          Alert.alert('Success', 'Ad deleted successfully');
+        },
+      },
+    ]);
   };
 
   const handleViewRequests = (adId: string) => {
-    router.push({
-      pathname: '/(modals)/adrequestModal',
-      params: { adId }, // pass ad ID to modal
-    });
+    router.push({ pathname: '/(modals)/adrequestModal', params: { adId } });
   };
 
   return (
     <ScreenWrapper>
       <View style={styles.container}>
         <Header
-          title={"My Ads"}
+          title="My Ads"
           leftIcon={<BackButton />}
           style={{ marginBottom: spacingY._10 }}
         />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
         >
-          {loading ? (
+          {loading && !refreshing ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
               <Typo style={styles.loadingText}>Loading your ads...</Typo>
@@ -157,7 +153,9 @@ const Statistics = () => {
                 )}
                 <View style={styles.adContent}>
                   <View style={styles.titleRow}>
-                    <Typo size={16} fontWeight="600" style={styles.titleText}>{ad.title}</Typo>
+                    <Typo size={16} fontWeight="600" style={styles.titleText}>
+                      {ad.title}
+                    </Typo>
                     <TouchableOpacity onPress={() => handleDelete(ad.id!)} style={styles.deleteButton}>
                       <MaterialIcons name="delete" size={22} color={colors.error} />
                     </TouchableOpacity>
@@ -166,7 +164,7 @@ const Statistics = () => {
                     PKR {ad.price?.toLocaleString?.() || 'N/A'}
                   </Typo>
                   <View style={styles.actionButtons}>
-                  <TouchableOpacity
+                    <TouchableOpacity
                       style={[styles.actionButton, styles.viewRequestsButton]}
                       onPress={() => handleViewRequests(ad.id!)}
                     >
@@ -177,7 +175,6 @@ const Statistics = () => {
                         </View>
                       )}
                     </TouchableOpacity>
-
                     <TouchableOpacity
                       style={[styles.actionButton, styles.editActionButton]}
                       onPress={() => handleEdit(ad.id!)}
@@ -210,23 +207,17 @@ const styles = StyleSheet.create({
   },
   adCard: {
     flexDirection: 'row',
-    backgroundColor: colors.neutral50, // Use a light gray instead of pure white
+    backgroundColor: colors.neutral50,
     borderRadius: radius._12,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
     marginBottom: spacingY._10,
   },
-  image: {
-    width: scale(100),
-    height: scale(100),
-  },
+  image: { width: scale(100), height: scale(100) },
   adContent: {
     flex: 1,
     padding: spacingX._10,
@@ -244,12 +235,12 @@ const styles = StyleSheet.create({
     marginRight: spacingX._8,
   },
   editActionButton: {
-    backgroundColor: 'transparent', // No background color, relies on the border
-    borderWidth: 1,  // Added border to the edit button
-    borderColor: colors.primary,  //Added border to the edit button
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   viewRequestsButton: {
-    backgroundColor: colors.neutral200, // A distinct color for the view requests button
+    backgroundColor: colors.neutral200,
     borderWidth: 0,
     borderColor: 'transparent',
   },
@@ -263,7 +254,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: spacingX._5,
     fontSize: 16,
-    color: colors.neutral800,  // Darker text color for better readability
+    color: colors.neutral800,
   },
   deleteButton: {
     padding: spacingX._5,
@@ -276,20 +267,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacingY._30,
   },
-  loadingText: {
-    marginTop: spacingY._10,
-    color: colors.neutral500,
-  },
+  loadingText: { marginTop: spacingY._10, color: colors.neutral500 },
   emptyStateContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: spacingY._30,
   },
-  emptyStateText: {
-    fontSize: 16,
-    color: colors.neutral500,
-  },
+  emptyStateText: { fontSize: 16, color: colors.neutral500 },
   notificationBadge: {
     position: 'absolute',
     top: -5,
