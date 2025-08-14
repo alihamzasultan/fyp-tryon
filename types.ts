@@ -185,4 +185,16 @@ export interface AdType {
   images: string[]
   description?: string
   createdAt?: any
+ 
+}
+
+export interface RequestType {
+  id?: string;
+  senderUid: string;
+  receiverUid: string;
+  adId: string;
+  message: string;
+  imageUri?: string | null;
+  timestamp?: any; // Use appropriate type for timestamp
+  status?: 'pending' | 'accepted' | 'rejected'; // Add status field
 }
