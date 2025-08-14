@@ -1,4 +1,3 @@
-// AdRequestsModal.tsx
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -7,7 +6,6 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import Typo from '@/components/Typo';
 import ModalWrapper from '@/components/ModalWrapper';
 import Header from '@/components/Header';
@@ -16,9 +14,9 @@ import { colors, spacingX, spacingY } from '@/constants/theme';
 import { scale, verticalScale } from '@/utils/styling';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { firestore } from '@/config/firebase';
-import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { RequestType } from '@/types';
-import { Image } from 'expo-image';  // Import expo-image
+import { Image } from 'expo-image';
 
 const AdRequestsModal = () => {
   const router = useRouter();
@@ -29,7 +27,7 @@ const AdRequestsModal = () => {
   useEffect(() => {
     const fetchRequests = async () => {
       if (!adId) return;
-
+    
       setLoading(true);
       try {
         const q = query(
@@ -37,10 +35,28 @@ const AdRequestsModal = () => {
           where('adId', '==', adId)
         );
         const snapshot = await getDocs(q);
-        const requestData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as RequestType[];
+    
+        const requestData: RequestType[] = await Promise.all(
+          snapshot.docs.map(async docSnap => {
+            const data = docSnap.data() as RequestType;
+            // fetch sender's name from users collection
+            let senderName = 'Unknown';
+            if (data.senderUid) {
+              const userDoc = await getDocs(
+                query(collection(firestore, 'users'), where('uid', '==', data.senderUid))
+              );
+              if (!userDoc.empty) {
+                senderName = userDoc.docs[0].data().name || 'Unknown';
+              }
+            }
+            return {
+              id: docSnap.id,
+              ...data,
+              senderName, // add senderName here
+            };
+          })
+        );
+    
         setRequests(requestData);
       } catch (error) {
         console.error('Error fetching requests:', error);
@@ -49,26 +65,18 @@ const AdRequestsModal = () => {
         setLoading(false);
       }
     };
+    
 
     fetchRequests();
   }, [adId]);
 
-  const handleAccept = async (requestId: string) => {
-    await updateRequestStatus(requestId, 'accepted');
-  };
-
-  const handleReject = async (requestId: string) => {
-    await updateRequestStatus(requestId, 'rejected');
-  };
-
   const updateRequestStatus = async (requestId: string, status: 'accepted' | 'rejected') => {
     try {
       const requestDocRef = doc(firestore, 'requests', requestId);
-      await updateDoc(requestDocRef, { status });
-      setRequests(prevRequests =>
-        prevRequests.map(req =>
-          req.id === requestId ? { ...req, status } : req
-        )
+      await updateDoc(requestDocRef, { status, seen: true });
+
+      setRequests(prev =>
+        prev.map(req => req.id === requestId ? { ...req, status, seen: true } : req)
       );
       Alert.alert('Success', `Request ${status}.`);
     } catch (error) {
@@ -77,56 +85,54 @@ const AdRequestsModal = () => {
     }
   };
 
-
   const renderRequestItem = ({ item }: { item: RequestType }) => {
+    const status = item.status ?? 'pending'; // default to 'pending'
     const statusColor =
-    item.status === 'accepted'
-        ? colors.green
-        : item.status === 'rejected'
-        ? colors.error
-        : colors.neutral500;
-
-
+      status === 'accepted' ? colors.green :
+      status === 'rejected' ? colors.error :
+      colors.neutral500;
+  
     return (
       <View style={styles.requestItemContainer}>
-        <View style={styles.requestContent}>
         {item.imageUri && (
-            <View style={styles.imagePreviewContainer}>
-                <Image
-                  source={{ uri: item.imageUri }}
-                  style={styles.imagePreview}
-                  contentFit="contain"
-                />
-              </View>
-          )}
-            <Typo size={14} color={colors.neutral400}>
+          <View style={styles.imagePreviewContainer}>
+            <Image
+              source={{ uri: item.imageUri }}
+              style={styles.imagePreview}
+              contentFit="cover"
+            />
+          </View>
+        )}
+        <View style={styles.requestContent}>
+        <Typo size={16} fontWeight="600" color={colors.neutral50}>
+          {item.senderName}
+        </Typo>
+
+          <Typo size={14} color={colors.neutral300}>
             {item.message}
-          </Typo>
-          <Typo size={14} color={colors.neutral400}>
-            Sender UID: {item.senderUid}
           </Typo>
         </View>
         <View style={styles.requestActions}>
-          {item.status !== 'accepted' && item.status !== 'rejected' && (
+          {status === 'pending' && (
             <>
-              <TouchableOpacity style={styles.acceptButton} onPress={() => handleAccept(item.id!)}>
+              <TouchableOpacity style={styles.acceptButton} onPress={() => updateRequestStatus(item.id!, 'accepted')}>
                 <Typo color={colors.green} fontWeight="600">Accept</Typo>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.rejectButton} onPress={() => handleReject(item.id!)}>
+              <TouchableOpacity style={styles.rejectButton} onPress={() => updateRequestStatus(item.id!, 'rejected')}>
                 <Typo color={colors.error} fontWeight="600">Reject</Typo>
               </TouchableOpacity>
             </>
           )}
-          {item.status && (
-               <Typo size={14} color={statusColor}>
-               Status: {item.status}
-             </Typo>
+          {status !== 'pending' && (
+            <Typo size={14} color={statusColor} fontWeight="500">
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </Typo>
           )}
         </View>
       </View>
     );
   };
-
+  
   return (
     <ModalWrapper>
       <View style={styles.container}>
@@ -158,61 +164,32 @@ const AdRequestsModal = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: spacingX._20,
-  },
-  flatListContent: {
-    paddingBottom: verticalScale(100),
-  },
+  container: { flex: 1, paddingHorizontal: spacingX._20 },
+  flatListContent: { paddingBottom: verticalScale(100) },
   requestItemContainer: {
-    flexDirection: 'column',
     backgroundColor: colors.neutral800,
-    borderRadius: 8,
-    padding: spacingX._10,
+    borderRadius: 12,
+    padding: spacingX._12,
     marginBottom: spacingY._10,
-  },
-  requestContent: {
-    flex: 1,
-  },
-  requestActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: spacingY._5,
-  },
-  acceptButton: {
-    paddingHorizontal: spacingX._12,
-    paddingVertical: spacingY._8,
-    borderRadius: 8,
-    marginRight: spacingX._8,
-  },
-  rejectButton: {
-    paddingHorizontal: spacingX._12,
-    paddingVertical: spacingY._8,
-    borderRadius: 8,
-    backgroundColor: colors.errorLight,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   imagePreviewContainer: {
-    alignItems: 'center',
-    marginBottom: spacingY._10,
-    width: scale(100),  // Explicit width
-    height: verticalScale(100), // Explicit height
+    width: scale(120),
+    height: verticalScale(120),
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignSelf: 'center',
+    marginBottom: spacingY._8,
   },
   imagePreview: {
-    width: '100%',    // Take up the full container width
-    height: '100%',   // Take up the full container height
-    borderRadius: 8,
+    width: '100%',
+    height: '100%',
   },
+  requestContent: { marginBottom: spacingY._8 },
+  requestActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacingX._8 },
+  acceptButton: { paddingHorizontal: spacingX._12, paddingVertical: spacingY._8, borderRadius: 8, backgroundColor: colors.neutral700 },
+  rejectButton: { paddingHorizontal: spacingX._12, paddingVertical: spacingY._8, borderRadius: 8, backgroundColor: colors.errorLight },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });
 
 export default AdRequestsModal;
