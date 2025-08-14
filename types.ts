@@ -138,17 +138,20 @@ export type UserType = {
   name: string | null;
   image?: any;
   phone?: string;
+  address?: string; 
 } | null;
 
 export type UserDataType = {
   name: string;
   image?: any;
   phone: string;
+  address?: string;
 };
 
 export type AuthContextType = {
   user: UserType;
   setUser: Function;
+  loading: boolean; 
   login: (
     email: string,
     password: string
@@ -197,4 +200,5 @@ export interface RequestType {
   imageUri?: string | null;
   timestamp?: any; // Use appropriate type for timestamp
   status?: 'pending' | 'accepted' | 'rejected'; // Add status field
+  senderName?: string;
 }
