@@ -18,6 +18,11 @@ export const updateUser = async (
             updateObject.phone = updatedData.phone;
         }
 
+        // Handle address if provided
+        if (updatedData.address) {
+            updateObject.address = updatedData.address;
+        }
+
         // Handle image upload if provided
         if (updatedData.image && updatedData.image.uri) {
             const imageUploadRes = await uploadFileToCloudinary(updatedData.image, "users");
