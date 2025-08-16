@@ -1,19 +1,41 @@
-import { View, Platform, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { colors } from '@/constants/theme';
 import { Feather } from '@expo/vector-icons';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useAuth } from '@/contexts/authContext';
+import { firestore } from '@/config/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
-// Constants for consistent sizing
 const ICON_SIZE = 26;
-const TOUCH_MIN_SIZE = 45; // Minimum recommended touch target size (48x48px)
-const TAB_BAR_HEIGHT = 70; // Fixed height for tab bar
+const TOUCH_MIN_SIZE = 45;
+const TAB_BAR_HEIGHT = 70;
 
-export default function CustomTabs({
-  state,
-  descriptors,
-  navigation
-}: BottomTabBarProps) {
+export default function CustomTabs({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { user } = useAuth();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // 🔴 Listen for pending requests
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const q = query(
+      collection(firestore, 'requests'),
+      where('receiverUid', '==', user.uid) // receiver = current user
+    );
+
+    const unsubscribe = onSnapshot(q, snapshot => {
+      const count = snapshot.docs.filter(docSnap => {
+        const status = docSnap.data().status;
+        return status !== 'accepted' && status !== 'rejected';
+      }).length;
+      setPendingCount(count);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid]);
+
   const tabbarIcons: any = {
     index: (isFocused: boolean) => (
       <Feather
@@ -23,11 +45,20 @@ export default function CustomTabs({
       />
     ),
     statistics: (isFocused: boolean) => (
-      <Feather
-        name="list"
-        size={ICON_SIZE}
-        color={isFocused ? colors.primary : colors.neutral400}
-      />
+      <View>
+        <Feather
+          name={!user?.isBuyer ? "list" : "shopping-cart"}
+          size={ICON_SIZE}
+          color={isFocused ? colors.primary : colors.neutral400}
+        />
+        {pendingCount > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>
+              {pendingCount > 99 ? '99+' : pendingCount}
+            </Text>
+          </View>
+        )}
+      </View>
     ),
     profile: (isFocused: boolean) => (
       <Feather
@@ -36,8 +67,6 @@ export default function CustomTabs({
         color={isFocused ? colors.primary : colors.neutral400}
       />
     ),
-
-    
     tryon: (isFocused: boolean) => (
       <Ionicons
         name="shirt-outline"
@@ -50,7 +79,6 @@ export default function CustomTabs({
   return (
     <View style={[styles.tabbar, { height: TAB_BAR_HEIGHT }]}>
       {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key];
         const isFocused = state.index === index;
 
         const onPress = () => {
@@ -59,7 +87,6 @@ export default function CustomTabs({
             target: route.key,
             canPreventDefault: true,
           });
-
           if (!isFocused && !event.defaultPrevented) {
             navigation.navigate(route.name, route.params);
           }
@@ -68,20 +95,10 @@ export default function CustomTabs({
         return (
           <TouchableOpacity
             key={route.name}
-            accessibilityRole="button"
-            accessibilityState={isFocused ? { selected: true } : {}}
             onPress={onPress}
             activeOpacity={0.6}
-            style={[styles.tabbarItem, { 
-              minWidth: TOUCH_MIN_SIZE,
-              minHeight: TOUCH_MIN_SIZE 
-            }]}
-            hitSlop={{
-              top: 16,
-              bottom: 16,
-              left: 16,
-              right: 16,
-            }}
+            style={[styles.tabbarItem, { minWidth: TOUCH_MIN_SIZE, minHeight: TOUCH_MIN_SIZE }]}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           >
             <View style={styles.iconContainer}>
               {tabbarIcons[route.name] && tabbarIcons[route.name](isFocused)}
@@ -113,5 +130,22 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
-  }
+  },
+  badge: {
+    position: 'absolute',
+    right: -6,
+    top: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
 });

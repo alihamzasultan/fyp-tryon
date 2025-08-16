@@ -22,7 +22,8 @@ import { AdType } from '@/types';
 import { Image } from 'expo-image';  // Import expo-image
 import { auth, firestore } from '@/config/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-
+import { sendPushNotification } from '@/services/notifications';
+import { doc, getDoc } from "firebase/firestore";
 const SendRequestModal = () => {
   const router = useRouter();
   const { shirtImageUri } = useLocalSearchParams<{ shirtImageUri?: string }>(); // Get the shirt image URI
@@ -72,7 +73,6 @@ const SendRequestModal = () => {
     }
   };
 
-
   const handleSendRequest = async () => {
     if (selectedAds.length === 0) {
       Alert.alert('Error', 'Please select at least one ad.');
@@ -91,8 +91,9 @@ const SendRequestModal = () => {
         const ad = allAds.find(a => a.id === adId);
         if (!ad) continue;
   
-        const receiverUid = ad.uid || null; // assuming ad.userId stores owner uid
+        const receiverUid = ad.uid || null;
   
+        // Save request in Firestore with status 'pending'
         await addDoc(collection(firestore, 'requests'), {
           senderUid,
           receiverUid,
@@ -100,7 +101,24 @@ const SendRequestModal = () => {
           message: requestMessage,
           imageUri: shirtImageUri || null,
           timestamp: serverTimestamp(),
+          status: 'pending',  // <-- New
         });
+  
+        // Send push notification
+        if (receiverUid) {
+          const userDoc = await getDoc(doc(firestore, "users", receiverUid));
+          if (userDoc.exists()) {
+            const { expoPushToken } = userDoc.data();
+            if (expoPushToken) {
+              await sendPushNotification(
+                expoPushToken,
+                "📬 New Request Received",
+                `${auth.currentUser?.displayName || "Someone"} sent you a request!`,
+                { adId }
+              );
+            }
+          }
+        }
   
         // Mark as sent locally
         setAdRequests(prev => ({ ...prev, [adId]: true }));

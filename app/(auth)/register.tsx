@@ -17,6 +17,8 @@ const Register = () => {
     const passwordRef = useRef("");
     const nameRef = useRef("");
     const [isLoading, setIsLoading] = useState(false);
+    const [isBuyer, setIsBuyer] = useState(true); // default buyer
+
     const router = useRouter();
     const { register: registerUser } = useAuth();
 
@@ -30,7 +32,8 @@ const Register = () => {
         const res = await registerUser(
           emailRef.current,
           passwordRef.current,
-          nameRef.current
+          nameRef.current,
+          isBuyer,
         );
         setIsLoading(false);
       
@@ -93,6 +96,21 @@ const Register = () => {
                         }
                     />
 
+                    <View style={styles.checkboxContainer}>
+                    <Pressable
+                        style={[styles.checkbox, isBuyer && styles.checked]}
+                        onPress={() => setIsBuyer(!isBuyer)}
+                    >
+                        {isBuyer && (
+                        <Ionicons name="checkmark" size={18} color={colors.white} />
+                        )}
+                    </Pressable>
+                    <Typo size={15}>
+                        {isBuyer ? "Registering as Buyer" : "Registering as Seller"}
+                    </Typo>
+                    </View>
+
+
                     <Button loading={isLoading} onPress={handleSubmit}>
 
                         <Typo fontWeight={'700'} color={colors.black} size={21}>
@@ -129,6 +147,25 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
         color: colors.text,
     },
+    checkboxContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+      },
+      checkbox: {
+        width: 22,
+        height: 22,
+        borderWidth: 1.5,
+        borderColor: colors.neutral300,
+        justifyContent: "center",
+        alignItems: "center",
+        borderRadius: 4,
+      },
+      checked: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+      },
+      
     form: {
         gap: spacingY._20,
     },

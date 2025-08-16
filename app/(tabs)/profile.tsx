@@ -31,7 +31,7 @@ const Profile = () => {
   }, [user]);
   const accountOptions: accountOptionType[] = [
     {
-      title: "Edit Profile",
+      title: user?.isBuyer ? "Edit Profile" : "Edit Store",
       icon: (
         <Ionicons
           name="person"
@@ -39,45 +39,10 @@ const Profile = () => {
           color={colors.white}
         />
       ),
-      routeName: '/(modals)/profileModal',
+      routeName: user?.isBuyer 
+        ? '/(modals)/profileModal' 
+        : '/(modals)/storedetailsModal', // placeholder for store details modal
       bgColor: "#6366f1",
-    },
-    // {
-    //   title: "Info",
-    //   icon: (
-    //     <Ionicons
-    //       name="information-circle"
-    //       size={26}
-    //       color={colors.white}
-    //     />
-    //   ),
-    //   routeName: '/(modals)/info',
-    //   bgColor: colors.neutral600,
-    // },
-    // {
-    //   title: "Set Currency",
-    //   icon: (
-    //     <Ionicons
-    //       name="wallet"  // Icon for currency selection
-    //       size={26}
-    //       color={colors.white}
-    //     />
-    //   ),
-    //   routeName: '/(modals)/currencyModal',
-    //   bgColor: "orange",
-    // },
-
-    {
-      title: "Place an ad",
-      icon: (
-        <Ionicons
-          name="add"
-          size={26}
-          color={colors.white}
-        />
-      ),
-      routeName: '/(modals)/addModal',
-      bgColor: "orange",
     },
     {
       title: "Logout",
@@ -90,8 +55,24 @@ const Profile = () => {
       ),
       bgColor: "#e11d48",
     },
-
   ];
+  
+  // Post ad option for sellers
+
+  if (!user?.isBuyer) {
+    accountOptions.push({
+      title: "Post an ad",
+      icon: (
+        <Ionicons
+          name="add"
+          size={26}
+          color={colors.white}
+        />
+      ),
+      routeName: '/(modals)/addModal',
+      bgColor: "orange",
+    });
+  }
   
   const handleLogout = async() =>{
     await signOut(auth);

@@ -11,42 +11,22 @@ const StackLayout = () => {
                 name="(modals)/profileModal"
                 options={{ presentation: 'modal' }}
             />
-            <Stack.Screen
-                name="(modals)/walletModal"
-                options={{ presentation: 'modal' }}
-            />
+
                <Stack.Screen
                 name="(modals)/sendnotificationModal"
                 options={{ presentation: 'modal' }}
             />
-            <Stack.Screen
-                name="(modals)/transactionModal"
-                options={{ presentation: 'modal' }}
-            />
-            <Stack.Screen
-                name="(modals)/searchModal"
-                options={{ presentation: 'modal' }}
-            />
-            <Stack.Screen
-                name="(modals)/info"
-                options={{ presentation: 'modal' }}
-            />
-            <Stack.Screen
-                name="(modals)/currencyModal"
-                options={{ presentation: 'modal' }}
-            />
-            <Stack.Screen
-                name="(modals)/incomeModal"
-                options={{ presentation: 'modal' }}
-            />
-            <Stack.Screen
-                name="(modals)/expenseModal"
-                options={{ presentation: 'modal' }}
-            />
+      
+     
+      
                     <Stack.Screen
                 name="(modals)/addModal"
                 options={{ presentation: 'modal' }}
-            />
+            />           
+             <Stack.Screen
+            name="(modals)/storedetailsModal"
+            options={{ presentation: 'modal' }}
+        />
         </Stack>
     );
 };

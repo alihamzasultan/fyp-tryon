@@ -1,20 +1,27 @@
 // Tryon.tsx
-import { Alert, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, ScrollView } from 'react-native'
-import React, { useState } from 'react'
-import ScreenWrapper from '@/components/ScreenWrapper'
-import { colors, radius, spacingX, spacingY } from '@/constants/theme'
-import { verticalScale } from '@/utils/styling'
-import Header from '@/components/Header'
-import Typo from '@/components/Typo'
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
+  ScrollView,
+} from 'react-native';
+import React, { useState, useMemo } from 'react';
+import ScreenWrapper from '@/components/ScreenWrapper';
+import { colors, radius, spacingX, spacingY } from '@/constants/theme';
+import { verticalScale  } from '@/utils/styling'; // Import horizontalScale
+import Header from '@/components/Header';
+import Typo from '@/components/Typo';
 import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons'; 
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
-//import SendRequestModal from '../(modals)/sendnotificationModal' // Removed this import
-import { useRouter } from 'expo-router'
+import { useRouter } from 'expo-router';
+import BackButton from '@/components/BackButton';
 
 const API_URL = "https://web-production-89bd.up.railway.app";
-
 
 const Tryon = () => {
   const router = useRouter();
@@ -24,13 +31,13 @@ const Tryon = () => {
   const [selectedShirtImage, setSelectedShirtImage] = useState<string | null>(null);  // New state
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
- 
+
   const pickShirtImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 5],
-      quality: 1,
+      aspect: [3, 4], // Adjust aspect ratio for better fit
+      quality: 0.7,  // Reduce quality for faster processing
     });
 
     if (!result.canceled) {
@@ -43,8 +50,8 @@ const Tryon = () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 5],
-      quality: 1,
+      aspect: [3, 4], // Adjust aspect ratio for better fit
+      quality: 0.7, // Reduce quality for faster processing
     });
 
     if (!result.canceled) {
@@ -53,27 +60,33 @@ const Tryon = () => {
     }
   };
 
+    // Use useMemo to derive the isButtonVisible state
+    const isTryOnButtonVisible = useMemo(() => {
+      return shirtImage !== null && userImage !== null;
+    }, [shirtImage, userImage]);
+
+
   const handleConfirm = async () => {
     if (!shirtImage || !userImage) {
       Alert.alert("Error", "Please select both a shirt image and your image");
       return;
     }
-   
+
     try {
       setLoading(true);
-     
+
       // Convert images to base64
       const shirtBase64 = await FileSystem.readAsStringAsync(shirtImage, {
         encoding: FileSystem.EncodingType.Base64,
       });
-     
+
       const userBase64 = await FileSystem.readAsStringAsync(userImage, {
         encoding: FileSystem.EncodingType.Base64,
       });
-     
+
       // Debugging: Log the API call details
       console.log(`Sending request to: ${API_URL}/try-on`);
-     
+
       // Send to backend
       const response = await fetch(`${API_URL}/try-on`, {
         method: 'POST',
@@ -85,13 +98,13 @@ const Tryon = () => {
           userImage: userBase64,
         }),
       });
-     
+
       // Debugging: Log the raw response
       const responseText = await response.text();
       console.log("Raw response:", responseText);
-     
+
       const data = JSON.parse(responseText);
-     
+
       if (data.success && data.imageUrl) {
         setResultImage(`${API_URL}${data.imageUrl}`);
       } else {
@@ -107,63 +120,75 @@ const Tryon = () => {
 
   const handleSendRequest = async () => {
     if (shirtImage) {
-        try {
-            const shirtBase64 = await FileSystem.readAsStringAsync(shirtImage, {
-                encoding: FileSystem.EncodingType.Base64,
-            });
-            const shirtDataUri = `data:image/jpeg;base64,${shirtBase64}`; // Or the correct MIME type
+      try {
+        const shirtBase64 = await FileSystem.readAsStringAsync(shirtImage, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const shirtDataUri = `data:image/jpeg;base64,${shirtBase64}`; // Or the correct MIME type
 
-            router.push({
-                pathname: '/(modals)/sendnotificationModal',
-                params: { shirtImageUri: shirtDataUri },
-            });
-        } catch (error) {
-            console.error("Error converting image to base64:", error);
-            Alert.alert("Error", "Failed to process image. Please try again.");
-        }
+        router.push({
+          pathname: '/(modals)/sendnotificationModal',
+          params: { shirtImageUri: shirtDataUri },
+        });
+      } catch (error) {
+        console.error("Error converting image to base64:", error);
+        Alert.alert("Error", "Failed to process image. Please try again.");
+      }
     } else {
-        Alert.alert("Error", "Please upload a shirt image first.");
+      Alert.alert("Error", "Please upload a shirt image first.");
     }
-};
+  };
 
   return (
     <ScreenWrapper>
       <ScrollView style={styles.container}>
-        <Header title="Virtual Try-On" style={{ marginVertical: spacingY._10 }} />
-       
+
+      <Header
+          title="Virtual Try-On"
+          leftIcon={<BackButton />}
+          style={{ marginBottom: spacingY._10, marginTop:spacingY._10 }}
+        />
+        {/* <Header title="Virtual Try-On" style={{ marginVertical: spacingY._10 }} /> */}
+
         <Typo size={16} style={styles.description} color={colors.neutral400}>
-          Upload a shirt image and your photo to see how it looks on you
+          Upload a shirt image and your photo.
         </Typo>
 
         <View style={styles.imageContainer}>
           <View style={styles.imageWrapper}>
             <Typo size={14} style={styles.imageLabel}>Shirt Image</Typo>
-            {shirtImage ? (
-              <Image
-                source={{ uri: shirtImage }}
-                style={styles.previewImage}
-                contentFit="contain"
-              />
-            ) : (
-              <View style={styles.placeholder}>
-                <Ionicons name="shirt-outline" size={40} color={colors.neutral400} />
-              </View>
-            )}
+            <TouchableOpacity style={styles.imagePickerButton} onPress={pickShirtImage}>
+              {shirtImage ? (
+                <Image
+                  source={{ uri: shirtImage }}
+                  style={styles.previewImage}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.placeholder}>
+                  <Ionicons name="shirt-outline" size={40} color={colors.neutral400} />
+                  <Typo size={12} color={colors.neutral400}>Upload</Typo>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
 
           <View style={styles.imageWrapper}>
             <Typo size={14} style={styles.imageLabel}>Your Image</Typo>
-            {userImage ? (
-              <Image
-                source={{ uri: userImage }}
-                style={styles.previewImage}
-                contentFit="contain"
-              />
-            ) : (
-              <View style={styles.placeholder}>
-                <Ionicons name="person-outline" size={40} color={colors.neutral400} />
-              </View>
-            )}
+            <TouchableOpacity style={styles.imagePickerButton} onPress={pickUserImage}>
+              {userImage ? (
+                <Image
+                  source={{ uri: userImage }}
+                  style={styles.previewImage}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={styles.placeholder}>
+                  <Ionicons name="person-outline" size={40} color={colors.neutral400} />
+                  <Typo size={12} color={colors.neutral400}>Upload</Typo>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -180,35 +205,18 @@ const Tryon = () => {
               onPress={handleSendRequest} // Use the new handler
             >
               <Ionicons name="send" size={20} color={colors.white} />
-              <Typo size={16} color={colors.white}>Send Request</Typo>
-             
+              <Typo size={16} color={colors.white}>Send to Friend</Typo>
+
             </TouchableOpacity>
           </View>
         )}
 
+        {isTryOnButtonVisible && (
         <View style={styles.buttonsContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.uploadButton]}
-            onPress={pickShirtImage}
-            disabled={loading}
-          >
-            <Ionicons name="shirt" size={20} color={colors.white} />
-            <Typo size={16} color={colors.white}>Upload Shirt</Typo>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.button, styles.uploadButton]}
-            onPress={pickUserImage}
-            disabled={loading}
-          >
-            <Ionicons name="person" size={20} color={colors.white} />
-            <Typo size={16} color={colors.white}>Upload Your Image</Typo>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={[styles.button, styles.confirmButton, loading && styles.disabledButton]}
             onPress={handleConfirm}
-            disabled={!shirtImage || !userImage || loading}
+            disabled={loading} // Disable based on loading state only
           >
             {loading ? (
               <ActivityIndicator color={colors.white} />
@@ -220,10 +228,9 @@ const Tryon = () => {
             )}
           </TouchableOpacity>
         </View>
+        )}
       </ScrollView>
-     
-   
-          </ScreenWrapper>
+    </ScreenWrapper>
   )
 }
 
@@ -237,10 +244,13 @@ const styles = StyleSheet.create({
   description: {
     textAlign: 'center',
     marginBottom: verticalScale(30),
+    fontSize: 15, // Slightly larger and cleaner font
   },
   requestButton: {
-    backgroundColor: colors.neutral350,
+    backgroundColor: colors.primary,
     marginTop: verticalScale(15),
+    paddingHorizontal: spacingX._20, // Add horizontal padding
+    borderRadius: radius._20, // More rounded corners
   },
   imageContainer: {
     flexDirection: 'row',
@@ -254,20 +264,26 @@ const styles = StyleSheet.create({
   imageLabel: {
     marginBottom: verticalScale(10),
     color: colors.neutral500,
+    fontWeight: '500',
+  },
+  imagePickerButton: {  // Style for touchable opacity around image
+    width: '100%',
+    height: verticalScale(200),
   },
   previewImage: {
     width: '100%',
-    height: verticalScale(200),
+    height: '100%',
     borderRadius: radius._10,
-    backgroundColor: colors.neutral700,
   },
   placeholder: {
     width: '100%',
     height: verticalScale(200),
     borderRadius: radius._10,
-    backgroundColor: colors.neutral700,
+    backgroundColor: colors.neutral100, // Lighter background
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,          // Added border
+    borderColor: colors.neutral300,  // Added border color
   },
   buttonsContainer: {
     marginTop: verticalScale(20),
@@ -301,6 +317,4 @@ const styles = StyleSheet.create({
     borderRadius: radius._10,
     backgroundColor: colors.neutral700,
   },
-
-
-})
+});

@@ -138,17 +138,31 @@ export type UserType = {
   name: string | null;
   image?: any;
   phone?: string;
+  address?: string; 
+  isBuyer?: boolean;
+  store?: StoreType; 
 } | null;
 
 export type UserDataType = {
   name: string;
   image?: any;
   phone: string;
+  address?: string;
+};
+export interface StoreType {
+  id?: string;
+  name: string;
+  location: string;
+  description?: string;
+  logo?: string;
+  banner?: string;
+  ownerId?: string;
 };
 
 export type AuthContextType = {
   user: UserType;
   setUser: Function;
+  loading: boolean; 
   login: (
     email: string,
     password: string
@@ -157,6 +171,7 @@ export type AuthContextType = {
     email: string,
     password: string,
     name: string,
+    isBuyer: boolean,
     phone?: string  // Add optional phone for registration
   ) => Promise<{ success: boolean; msg?: string }>;
   updateUserData: (userId: string) => Promise<void>;
@@ -185,6 +200,7 @@ export interface AdType {
   images: string[]
   description?: string
   createdAt?: any
+  ownerId: string; 
  
 }
 
@@ -197,4 +213,57 @@ export interface RequestType {
   imageUri?: string | null;
   timestamp?: any; // Use appropriate type for timestamp
   status?: 'pending' | 'accepted' | 'rejected'; // Add status field
+  senderName?: string;
+  description?: string;
+  price?: string;
+  acceptedPrice?: string;
+  acceptedDetails?: string;
+  acceptedAt?: string;
+  rejectedReason?: string;
+  rejectedAt?: string;
+}
+
+export interface Participant {
+  id: string;
+  name: string;
+  image: string | null;
+  isBuyer: boolean;
+}
+
+export interface AdInfo {
+  id: string;
+  title: string;
+  price: number;
+  images: string[];
+}
+
+export interface LastMessage {
+  text: string;
+  senderId: string;
+  createdAt: any;   // Firestore Timestamp
+}
+
+export interface Message {
+  id: string;
+  senderId: string;
+  text: string;
+  createdAt: any;   // Firestore Timestamp
+}
+
+export interface ChatRoom {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  adId: string;
+  createdAt: any;   // Firestore Timestamp
+  lastMessage?: string;
+  lastMessageTime?: any;   // Firestore Timestamp
+}
+export interface ChatItem {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  adId: string;
+  lastMessage?: string;
+  lastMessageTime?: any;
 }
